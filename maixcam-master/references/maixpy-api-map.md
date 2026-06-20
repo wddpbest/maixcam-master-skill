@@ -11,6 +11,7 @@ Use this reference when writing or checking MaixPy code. Verify live APIs agains
 - MaixPy API index: <https://wiki.sipeed.com/maixpy/api/index.html>
 - Camera API: <https://wiki.sipeed.com/maixpy/api/maix/camera.html>
 - Display API: <https://wiki.sipeed.com/maixpy/api/maix/display.html>
+- Touchscreen API: <https://wiki.sipeed.com/maixpy/api/maix/touchscreen.html>
 - Image API: <https://wiki.sipeed.com/maixpy/api/maix/image.html>
 - NN API: <https://wiki.sipeed.com/maixpy/api/maix/nn.html>
 - UART API: <https://wiki.sipeed.com/maixpy/api/maix/peripheral/uart.html>
@@ -21,11 +22,11 @@ Use this reference when writing or checking MaixPy code. Verify live APIs agains
 
 ```python
 from maix import camera, display, image, time
-from maix import nn
-from maix.peripheral import uart
+from maix import nn, touchscreen
+from maix.peripheral import uart, key
 ```
 
-Check imports against the current firmware. Some examples use `from maix import uart`; others use `from maix.peripheral import uart` according to API grouping.
+Check imports against the current firmware. Some examples use `from maix import uart`; others use `from maix.peripheral import uart` according to API grouping. Touchscreen is documented as `maix.touchscreen`; keys are documented under `maix.peripheral.key`.
 
 ## Camera Notes
 
@@ -37,13 +38,13 @@ cam.skip_frames(10)
 img = cam.read()
 ```
 
-When chasing latency, consider lower resolution, lower buffer count only after testing, `clear_buff()` before critical reads, and turning off display overlays.
+When chasing latency, consider lower resolution, lower buffer count only after testing, `clear_buff()` before critical reads, and reducing overlay density.
 
 When chasing stability, probe camera getters/setters such as resolution, FPS, exposure, gain, mirror, and flip against the current API docs.
 
-## Display and Debug
+## Display, Touch, and Keys
 
-Use display output for early validation. Make it configurable because drawing and display refresh can dominate runtime.
+Use display output for early validation and as the default runtime surface. Make overlay density configurable because drawing and display refresh can dominate runtime.
 
 Debug overlays should show:
 
@@ -52,6 +53,27 @@ Debug overlays should show:
 - FPS.
 - Current threshold/score.
 - Lost-target counter or command output.
+- Current UI mode: run view or tuning view.
+
+Use touchscreen and built-in keys for on-device tuning before falling back to UART-only control:
+
+```python
+from maix import touchscreen
+from maix.peripheral import key
+
+ts = touchscreen.TouchScreen()
+keys = key.Key()
+
+if ts.available(0):
+    x, y, pressed = ts.read()
+
+key_id, state = keys.read()
+if state == key.State.KEY_PRESSED:
+    if key_id in (key.Keys.KEY_OK, key.Keys.KEY_OPTION):
+        ui_state["mode"] = "tuning" if ui_state["mode"] == "run" else "run"
+```
+
+The TouchScreen API returns `[x, y, pressed]` from `read()`, and `available(timeout=0)` can be polled without blocking. The Key API returns a key id and state from `read()`, and supports enums such as `KEY_OK`, `KEY_NEXT`, `KEY_PREV`, `KEY_PRESSED`, and `KEY_LONG_PRESSED`.
 
 ## Classical Vision Code Pattern
 
@@ -83,9 +105,9 @@ Use `maix.nn` when a `.mud` model is available and classical vision is not enoug
 
 Always include a fallback note: if the user lacks a model, use MaixHub or another training/export path, then validate on real frames.
 
-## UART Tuning and Robot Output
+## UART Output and Fallback Tuning
 
-Use UART both for robot commands and runtime tuning when possible. Keep protocols newline-delimited and human-readable during development.
+Use UART for robot commands and as a fallback tuning channel. Keep protocols newline-delimited and human-readable during development.
 
 Example command outputs:
 
@@ -95,7 +117,7 @@ cmd,steer,0.08,speed,0.25
 target,0,lost,7
 ```
 
-Example tuning commands:
+Example fallback tuning commands:
 
 ```text
 set min_area 300
@@ -106,4 +128,3 @@ save
 ```
 
 Do not send unbounded control values. Clamp steering/speed, rate-limit output, and define a lost-target command.
-
