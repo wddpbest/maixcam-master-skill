@@ -1,6 +1,6 @@
 # maixcam-master-skill
 
-Codex skill for MaixCAM vision recognition, MaixPy workflows, staged validation, and dynamic tuning.
+Codex skill for MaixCAM vision recognition, MaixPy workflows, staged validation, screen-first touch/button tuning, and dynamic robot output.
 
 ## 快速安装
 
@@ -51,11 +51,11 @@ C:\Users\<你的用户名>\.codex\skills\maixcam-master\references\maixpy-api-ma
 重启后可以这样测试：
 
 ```text
-Use $maixcam-master to help me build a MaixCAM color object tracking task. Guide me from camera probe, threshold tuning, live validation, to UART command output for a moving robot.
+Use $maixcam-master to help me build a MaixCAM color object tracking task. Guide me from camera probe, default run view, touchscreen tuning view, built-in button page switching, live validation, to UART command output for a moving robot.
 ```
 
 也可以中文测试：
 
 ```text
-使用 $maixcam-master，帮我做一个 MaixCAM 视觉识别任务：识别红色目标并通过串口输出目标中心偏差。先带我一步一步验证，再设计运动过程中的动态调参。
+使用 $maixcam-master，帮我做一个 MaixCAM 视觉识别任务：识别红色目标并通过串口输出目标中心偏差。代码默认前台运行，屏幕显示运行界面，用自带按钮切换运行界面/调参界面，用触摸屏优先调阈值、ROI、面积过滤和输出频率，再带我一步一步验证运动过程中的效果。
 ```
