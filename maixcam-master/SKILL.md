@@ -1,6 +1,6 @@
 ---
 name: maixcam-master
-description: Use when building, debugging, tuning, or reviewing MaixCAM or MaixPy vision recognition tasks, including color blob tracking, line following, QR/AprilTag recognition, object detection, classification, OpenMV/OpenCV-style image processing, camera/display/uart integration, dynamic parameter tuning, and step-by-step validation on moving robots or embedded vision systems.
+description: Use when building, debugging, tuning, or reviewing MaixCAM or MaixPy vision recognition tasks, including color blob tracking, line following, QR/AprilTag recognition, object detection, classification, OpenMV/OpenCV-style image processing, camera/display/touch/key/uart integration, screen-first dynamic parameter tuning, and step-by-step validation on moving robots or embedded vision systems.
 ---
 
 # MaixCAM Master
@@ -18,7 +18,7 @@ Prefer official, current sources before relying on memory:
 
 Read these references only when needed:
 
-- `references/maixcam-vision-workflow.md` for staged task analysis, algorithm selection, and validation loops.
+- `references/maixcam-vision-workflow.md` for staged task analysis, algorithm selection, screen-first tuning UI, and validation loops.
 - `references/maixpy-api-map.md` for MaixPy source/API lookup guidance and code patterns.
 
 ## Operating Rules
@@ -26,11 +26,12 @@ Read these references only when needed:
 1. Start by restating the visual target, output signal, robot action, and success metric.
 2. Ask only for missing facts that materially change the algorithm: target appearance, camera pose, distance range, lighting, background clutter, frame rate, motion speed, output interface, and available model files.
 3. Choose a staged plan before writing final code: static image test, live camera visualization, detection metric logging, parameter sweep, motion test, then deployment hardening.
-4. Make every generated program tunable. Put thresholds, ROI, score limits, area limits, debounce windows, UART protocol, and camera settings in a config block.
-5. Design for runtime tuning when the target moves: support at least one of UART commands, key/button adjustments, touchscreen/menu, config file reload, or visible on-screen parameter overlay.
-6. Prefer robust pipelines over clever single thresholds: ROI, exposure/white balance control, morphology or contour filtering, temporal smoothing, confidence hysteresis, stale target timeout, and safe fallback output.
-7. Keep MaixPy code hardware-aware: resolution, pixel format, buffer count, model input size, memory pressure, display overhead, serial bandwidth, and FPS budget.
-8. Never claim an API call is correct if it has not been verified against current docs/source. If uncertain, say what must be checked and provide a small probe script.
+4. Make every generated program tunable. Put thresholds, ROI, score limits, area limits, debounce windows, UART protocol, UI mode, and camera settings in a config block.
+5. For MaixCAM foreground tasks, make the default UI screen-first: boot into a run view, keep the camera frame and recognition overlay visible, use built-in buttons to switch between run view and tuning view, and use touchscreen/menu controls for parameter changes.
+6. Keep UART available for robot output and as a secondary tuning fallback. Do not make serial-only tuning the default when display, touchscreen, and buttons are available.
+7. Prefer robust pipelines over clever single thresholds: ROI, exposure/white balance control, morphology or contour filtering, temporal smoothing, confidence hysteresis, stale target timeout, and safe fallback output.
+8. Keep MaixPy code hardware-aware: resolution, pixel format, buffer count, model input size, memory pressure, display/touch overhead, serial bandwidth, and FPS budget.
+9. Never claim an API call is correct if it has not been verified against current docs/source. If touch/key/display APIs are uncertain on the target firmware, say so and provide a small probe script.
 
 ## Task Decomposition
 
@@ -42,7 +43,7 @@ Use this checklist for each task:
 | Algorithm route | Pick classical vision, AI model, code marker, or hybrid | Reasoned route plus fallback |
 | Static proof | Test on saved frames or controlled still scene | Thresholds, ROI, example detections |
 | Live proof | Show overlays and print metrics | FPS, count, coordinates, confidence |
-| Dynamic tuning | Adjust parameters while moving | Tuning interface and log format |
+| Dynamic tuning | Adjust parameters while moving | Touchscreen tuning view, button navigation, UART fallback, and log format |
 | Control integration | Convert detection to robot command | Bounded, debounced command protocol |
 | Hardening | Handle loss, glare, blur, false positives, startup, and CPU load | Recovery behavior and final config |
 
@@ -64,12 +65,15 @@ Prefer the least complex method that meets the scene contract:
 Generated MaixPy code should normally include:
 
 - `CONFIG` dictionary at the top.
-- `open_camera(config)` and `open_outputs(config)` helpers.
+- `open_camera(config)` and `open_outputs(config)` helpers for display, touchscreen, keys, UART, and optional logs.
 - `detect(img, config)` returning structured target records.
-- `update_tuning(config, input_state)` for UART/key/config-file changes.
-- `draw_debug(img, targets, config, stats)` for display overlays.
+- `ui_state` with `mode` defaulting to `run`, plus selected parameter/page state for the tuning view.
+- `read_buttons(ui_state, config)` for built-in button navigation, with at least one button switching between run view and tuning view.
+- `read_touch(ui_state, config)` or `update_tuning(config, input_state)` for touchscreen parameter edits first, UART/config-file edits second.
+- `draw_run_view(img, targets, config, stats)` showing camera frame, ROI, target box, center error, FPS, and current output.
+- `draw_tuning_view(img, targets, config, stats, ui_state)` showing editable thresholds, ROI, area filters, smoothing, lost timeout, and command rate.
 - `command_from_target(target, config)` that bounds robot commands and handles lost targets.
-- Main loop with FPS timing, stale-frame handling, and graceful exit.
+- Main loop that keeps the program in the foreground, reads camera/input every frame, draws the current view, sends rate-limited output, and exits gracefully.
 
 Use small probe scripts before full programs when hardware details are unknown:
 
@@ -88,14 +92,26 @@ while True:
 
 ## Dynamic Tuning Pattern
 
-Every motion-capable solution should expose live adjustments:
+Every motion-capable solution should expose live adjustments on the MaixCAM itself.
+
+Default UI contract:
+
+- Foreground app: generated code should run as the visible foreground task by default.
+- Run view: default page after boot, showing recognition results over the live camera image.
+- Tuning view: alternate page for thresholds, ROI, min/max area, smoothing, lost timeout, and output rate.
+- Built-in buttons: switch pages, select fields, and apply coarse increments without needing a PC.
+- Touchscreen: primary fine-tuning input for sliders, plus/minus controls, ROI handles, or menu taps.
+- UART: robot output first, fallback tuning channel second.
+
+Tune these controls when relevant:
 
 - Camera: resolution, FPS, exposure, gain, white balance/manual lock if supported.
 - Vision: ROI, thresholds, min/max area, confidence, NMS/IoU, smoothing alpha, lost timeout.
+- UI: run/tuning view state, selected field, touch step size, overlay density, save/dump actions.
 - Control: center deadband, steering gain, speed limit, command rate, emergency stop.
 - Debug: overlay on/off, log interval, frame dump trigger, current config print.
 
-Prefer UART for robot integration because it also doubles as a tuning channel. Use newline-delimited commands such as:
+Use newline-delimited UART commands as a compatibility fallback and for MCU-side integration:
 
 ```text
 set min_area 300
@@ -110,7 +126,9 @@ dump
 For every delivered solution, include:
 
 - The first script to run.
-- What the user should see on screen.
+- What the user should see on the default run view.
+- How to enter the tuning view with built-in buttons.
+- Which touchscreen controls change the key parameters.
 - What serial/log lines should look like.
 - Which parameter to tune first if detection fails.
 - A table of observed symptoms and next changes.
@@ -124,6 +142,6 @@ For every delivered solution, include:
 | Tuning thresholds while auto exposure keeps moving | Lock or log exposure/gain when possible |
 | Measuring only "it detects once" | Measure FPS, false positives, lost frames, and command stability |
 | Sending raw pixel error directly to motors | Add deadband, smoothing, rate limits, and lost-target fallback |
-| Ignoring display cost | Allow display/debug overlay to be disabled during speed tests |
+| Ignoring display cost | Allow overlay density to be reduced during speed tests |
+| Defaulting to serial-only tuning on MaixCAM | Prefer foreground run/tuning views with touchscreen and buttons, keep UART as fallback |
 | Hard-coding one lab scene | Keep config editable and document the tuning order |
-
