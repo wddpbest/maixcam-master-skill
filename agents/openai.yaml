@@ -1,0 +1,8 @@
+interface:
+  display_name: "MaixCAM Master"
+  short_description: "MaixCAM vision workflow expert"
+  default_prompt: "Use $maixcam-master to analyze and implement a MaixCAM vision recognition task."
+
+policy:
+  allow_implicit_invocation: true
+
