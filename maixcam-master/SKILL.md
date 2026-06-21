@@ -98,9 +98,9 @@ Default UI contract:
 
 - Foreground app: generated code should run as the visible foreground task by default.
 - Run view: default page after boot, showing recognition results over the live camera image.
-- Tuning view: alternate page for thresholds, ROI, min/max area, smoothing, lost timeout, and output rate.
-- Built-in buttons: switch pages, select fields, and apply coarse increments without needing a PC.
-- Touchscreen: primary fine-tuning input for sliders, plus/minus controls, ROI handles, or menu taps.
+- Tuning view: alternate page for thresholds, ROI, min/max area, smoothing, lost timeout, and output rate. For color threshold tasks, show a binary preview from the current threshold values.
+- Built-in buttons: switch pages/modes only by default. Do not use buttons for numeric edits when touchscreen controls are available.
+- Touchscreen: primary fine-tuning input for sliders, plus/minus controls, ROI handles, or menu taps. Map raw touch coordinates into image/display coordinates before hit testing.
 - UART: robot output first, fallback tuning channel second.
 
 Tune these controls when relevant:
@@ -110,6 +110,8 @@ Tune these controls when relevant:
 - UI: run/tuning view state, selected field, touch step size, overlay density, save/dump actions.
 - Control: center deadband, steering gain, speed limit, command rate, emergency stop.
 - Debug: overlay on/off, log interval, frame dump trigger, current config print.
+
+For threshold tuning, keep the tuning view visually clean: do not draw target boxes, target centers, ROI frames, or center lines over the binary preview unless the user explicitly requests diagnostic overlays. Show touch raw/mapped coordinates and miss feedback while calibrating the UI.
 
 Use newline-delimited UART commands as a compatibility fallback and for MCU-side integration:
 
