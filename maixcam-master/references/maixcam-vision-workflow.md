@@ -69,6 +69,20 @@ Button behavior should be simple and memorable:
 
 Touchscreen behavior should favor fast field tuning: tap controls, drag ROI handles, or use large plus/minus zones. Keep touch handling non-blocking so detection and UART output stay responsive.
 
+### Field Lessons for Touch Tuning
+
+Apply these patterns when generating a MaixCAM tuning interface:
+
+- Use physical keys only for mode/page switching unless the user asks for key-based numeric editing.
+- Draw touch buttons on the screen for numeric edits such as LAB threshold plus/minus, ROI, `min_pixels`, and `min_area`.
+- For color threshold work, make the tuning view a binary preview using the current threshold values. This lets the user see exactly what the detector mask keeps or rejects.
+- Keep the tuning view clean: do not draw target boxes, center dots, ROI frames, or center lines over the binary preview unless explicitly debugging geometry.
+- Convert raw touchscreen coordinates to the displayed image coordinate system before button hit testing. MaixCAM touch often reports a larger coordinate space than a 320x240 camera image, such as 640x480 touch mapped to 320x240 image.
+- Show both raw and mapped touch coordinates while calibrating, for example `raw:578,160 img:289,80`.
+- Add a small hit padding and debounce, but keep padding tight enough that empty space does not hit nearby buttons.
+- When a touch does not hit any button, update visible feedback such as `last:none` so stale labels do not look like repeated button presses.
+- Validate touch mapping with at least two points: a point outside the button row must not trigger, and a point inside the intended button must trigger.
+
 ## Tuning Order
 
 Tune in this order:
@@ -90,6 +104,8 @@ Tune in this order:
 | Many false positives | Background shares features | Add ROI, area/shape filters, temporal confirmation, or AI confirmation |
 | FPS too low | Resolution/model/display too heavy | Lower resolution, crop ROI, reduce overlay density, use simpler algorithm |
 | Button/touch tuning feels laggy | Input handling blocks camera loop or redraw is too heavy | Poll input non-blocking, draw less text, rate-limit UI refresh |
+| Touching empty space changes a parameter | Raw touch coordinates are not mapped to image/display coordinates, or hit padding is too large | Scale raw coordinates before hit testing, shrink padding, show `last:none` for misses |
+| Tuning mask is hard to judge | Detection overlays cover the binary preview | Hide target box, center point, ROI frame, and center line in tuning view |
 | Robot oscillates | Control gain too high or no smoothing | Add deadband, low-pass center error, limit command rate |
 | Works on desk but fails moving | Blur/vibration/lighting changes | Shorten exposure, reduce speed, add motion test frames, retune live |
 
@@ -103,5 +119,7 @@ Define a final test that includes:
 - Default boot into run view with visible recognition overlay.
 - Button switching between run view and tuning view while detection continues.
 - Touchscreen adjustment of at least one critical parameter during motion.
+- Tuning view binary preview reflects the current threshold values without target overlays obscuring the mask.
+- Touch coordinate debug shows raw and mapped coordinates, and empty-space touches do not change parameters.
 - Logged FPS, detection rate, false positives, lost-target events, and command output.
 - A saved final config block.
