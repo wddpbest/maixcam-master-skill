@@ -75,6 +75,34 @@ if state == key.State.KEY_PRESSED:
 
 The TouchScreen API returns `[x, y, pressed]` from `read()`, and `available(timeout=0)` can be polled without blocking. The Key API returns a key id and state from `read()`, and supports enums such as `KEY_OK`, `KEY_NEXT`, `KEY_PREV`, `KEY_PRESSED`, and `KEY_LONG_PRESSED`.
 
+Key handling pattern:
+
+- Call `key.rm_default_listener()` before creating/using custom key handling when `KEY_OK` should not exit the app.
+- Use keys for mode/page switching first. Prefer touchscreen controls for numeric values.
+
+Touch mapping pattern:
+
+```python
+def map_touch_to_image(raw_x, raw_y, cfg):
+    x = int(raw_x * cfg["width"] / cfg["touch_raw_width"])
+    y = int(raw_y * cfg["height"] / cfg["touch_raw_height"])
+    return [max(0, min(cfg["width"] - 1, x)), max(0, min(cfg["height"] - 1, y))]
+```
+
+Keep both raw and mapped coordinates visible during calibration. If touching empty space changes a parameter, check raw-to-image scaling and reduce hit padding.
+
+## Threshold Binary Preview Pattern
+
+For RGB888 color tuning, MaixPy thresholds use LAB tuples in the form `[L_min, L_max, A_min, A_max, B_min, B_max]`. In tuning mode, show the current mask with `image.binary()` before drawing controls:
+
+```python
+if ui_state["mode"] == "tuning":
+    img.binary(cfg["thresholds"], invert=False, copy=False)
+    draw_tuning_controls(img, cfg, ui_state)
+```
+
+Keep the tuning mask clean. Draw target boxes, center points, ROI frames, and center lines in the run view, not over the binary preview, unless the user asks for geometry diagnostics.
+
 ## Classical Vision Code Pattern
 
 Keep algorithm-specific calls easy to swap. Use a detector function with structured records:
