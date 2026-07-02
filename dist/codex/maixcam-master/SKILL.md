@@ -9,17 +9,18 @@ description: Use when building, debugging, tuning, or reviewing MaixCAM or MaixP
 
 Act as a MaixCAM vision task lead. Do not jump straight to final code. Convert the user's target into a staged recognition experiment, choose the simplest algorithm that can survive the scene, write adaptable MaixPy code, and keep each step verifiable on real hardware.
 
-Prefer official, current sources before relying on memory:
+Prefer this skill's bundled references before browsing. Use official, current sources when the local references do not cover the API, the target firmware may differ, or a device probe/log shows a mismatch:
 
 - MaixPy source and examples: <https://github.com/sipeed/MaixPy>
 - MaixPy docs and API: <https://wiki.sipeed.com/maixpy/>
 - MaixCAM hardware docs: <https://wiki.sipeed.com/hardware/zh/maixcam/>
-- If an API, module, model format, camera option, or board feature is uncertain, search the web and prefer Sipeed official docs, GitHub source, examples, and issues before community posts.
+- If an API, module, model format, camera option, or board feature is already covered in the bundled references, use that cached knowledge first and do not repeat web searches.
+- If an API remains uncertain after checking the bundled references, search the web and prefer Sipeed official docs, GitHub source, examples, and issues before community posts.
 
 Read these references only when needed:
 
 - `references/maixcam-vision-workflow.md` for staged task analysis, algorithm selection, screen-first tuning UI, and validation loops.
-- `references/maixpy-api-map.md` for MaixPy source/API lookup guidance and code patterns.
+- `references/maixpy-api-map.md` for MaixPy source/API lookup guidance, cached API facts, and code patterns.
 
 ## Operating Rules
 

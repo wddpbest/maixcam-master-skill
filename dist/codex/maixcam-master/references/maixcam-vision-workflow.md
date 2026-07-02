@@ -73,14 +73,21 @@ Touchscreen behavior should favor fast field tuning: tap controls, drag ROI hand
 
 Apply these patterns when generating a MaixCAM tuning interface:
 
-- Use physical keys only for mode/page switching unless the user asks for key-based numeric editing.
-- Draw touch buttons on the screen for numeric edits such as LAB threshold plus/minus, ROI, `min_pixels`, and `min_area`.
-- For color threshold work, make the tuning view a binary preview using the current threshold values. This lets the user see exactly what the detector mask keeps or rejects.
+- Use physical keys only for mode/page switching unless the user explicitly asks for key-based numeric editing.
+- Draw all tunable parameters as touch boxes along the bottom of the screen. Each box should show only a short parameter name, not the value.
+- Show the selected parameter's current value in a single area on the left side of the screen.
+- Lay out bottom parameter boxes adaptively based on parameter count and screen width. Prefer a compact grid over a scrolling text list.
+- Touch selects a parameter box. Do not require keys to select fields.
+- After a parameter is selected, show large `+` and `-` touch controls on the right side of the screen.
+- Put a binary-preview toggle in the top-right corner, such as `BIN ON/OFF`, so the user can switch between camera view and threshold mask while tuning.
+- For color threshold work, the optional binary preview should use the current threshold values. This lets the user see exactly what the detector mask keeps or rejects.
 - Keep the tuning view clean: do not draw target boxes, center dots, ROI frames, or center lines over the binary preview unless explicitly debugging geometry.
 - Convert raw touchscreen coordinates to the displayed image coordinate system before button hit testing. MaixCAM touch often reports a larger coordinate space than a 320x240 camera image, such as 640x480 touch mapped to 320x240 image.
-- Show both raw and mapped touch coordinates while calibrating, for example `raw:578,160 img:289,80`.
+- For 320x240 camera/display tuning pages, default touch mapping to `touch_raw_width=640` and `touch_raw_height=480`, while allowing a config override if a firmware reports 320x240 touch coordinates.
+- Keep raw and mapped touch coordinates available as an optional debug overlay, for example `raw:578,160 img:289,80`, but hide this text by default in normal tuning UI.
+- Do not silently swallow touch `available()` or `read()` errors. Show a short visible status such as `touch av err:...`, `touch read err:...`, or `touch bad:...` so the user can distinguish API failure from hit-test failure.
 - Add a small hit padding and debounce, but keep padding tight enough that empty space does not hit nearby buttons.
-- When a touch does not hit any button, update visible feedback such as `last:none` so stale labels do not look like repeated button presses.
+- When a touch does not hit any button, update internal hit state so stale presses are not reused; do not show this state in the normal UI.
 - Validate touch mapping with at least two points: a point outside the button row must not trigger, and a point inside the intended button must trigger.
 
 ## Tuning Order
