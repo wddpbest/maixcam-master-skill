@@ -1,6 +1,6 @@
 # MaixPy API Map
 
-Use this reference when writing or checking MaixPy code. Verify live APIs against official docs/source when uncertain.
+Use this reference when writing or checking MaixPy code. Check this file before browsing. Verify live APIs against official docs/source only when this file does not cover the case, target firmware may differ, or device output contradicts these notes.
 
 ## Official Sources
 
@@ -46,6 +46,14 @@ When chasing stability, probe camera getters/setters such as resolution, FPS, ex
 
 Use display output for early validation and as the default runtime surface. Make overlay density configurable because drawing and display refresh can dominate runtime.
 
+Firmware compatibility notes from MaixCAM-Pro field logs:
+
+- `time.FPS()` may expose `start()`, `fps()`, and `end()`, but not `tick()`. Use `fps.start()` before the measured block and `fps.fps()`/`fps.end()` after it, or use module-level `time.fps()`.
+- Do not assume every named image color constant exists. For example, some builds have `COLOR_GRAY` but not `COLOR_CYAN`. Use `getattr(image, "COLOR_CYAN", image.COLOR_BLUE)` or stick to known basic colors after probing.
+- For compact 320x240 tuning UIs, avoid `COLOR_WHITE`/`COLOR_BLACK` text on camera or binary previews when readability matters; prefer green/yellow/blue/red accents and keep labels short.
+- Keep touch button labels inside stable boxes. A 7-column bottom grid is too narrow for labels such as `L_MIN`; use shorter labels like `L-`, `L+`, `PIX`, `AREA`, `R-X`, or use fewer columns.
+- `maix.image.Image.save(path, quality=95)` can save JPG/PNG images. For offline debugging, create `/root/data/image/` and `/root/data/video/`. For H.264 recording, official docs require `image.Format.FMT_YVU420SP` camera frames and `video.Encoder(type=video.VideoType.VIDEO_H264_CBR)`; write `frame.to_bytes(False)` to a `.h264` file.
+
 Debug overlays should show:
 
 - ROI rectangle.
@@ -84,20 +92,46 @@ Touch mapping pattern:
 
 ```python
 def map_touch_to_image(raw_x, raw_y, cfg):
-    x = int(raw_x * cfg["width"] / cfg["touch_raw_width"])
-    y = int(raw_y * cfg["height"] / cfg["touch_raw_height"])
+    raw_w = cfg.get("touch_raw_width", 640)
+    raw_h = cfg.get("touch_raw_height", 480)
+    if cfg.get("touch_auto_scale", True) and raw_x <= cfg["width"] and raw_y <= cfg["height"]:
+        raw_w = cfg["width"]
+        raw_h = cfg["height"]
+    x = int(raw_x * cfg["width"] / raw_w)
+    y = int(raw_y * cfg["height"] / raw_h)
     return [max(0, min(cfg["width"] - 1, x)), max(0, min(cfg["height"] - 1, y))]
 ```
 
-Keep both raw and mapped coordinates visible during calibration. If touching empty space changes a parameter, check raw-to-image scaling and reduce hit padding.
+Keep both raw and mapped coordinates visible during calibration. For 320x240 display code, include `touch_raw_width=640`, `touch_raw_height=480`, and `touch_auto_scale=True` in the config unless the user has measured a different touch coordinate space. If touching the screen does nothing, first inspect the visible raw/mapped coordinates and touch error status before changing hit boxes.
+
+Do not silently swallow touch errors:
+
+```python
+try:
+    event = ts.read()
+except Exception as exc:
+    ui_state["last_touch"] = "touch read err:%s" % exc
+    return None
+```
+
+This makes it clear whether the failure is touch API access, coordinate mapping, or hit testing.
 
 ## Threshold Binary Preview Pattern
 
-For RGB888 color tuning, MaixPy thresholds use LAB tuples in the form `[L_min, L_max, A_min, A_max, B_min, B_max]`. In tuning mode, show the current mask with `image.binary()` before drawing controls:
+For RGB888 color tuning, MaixPy thresholds use LAB tuples in the form `[L_min, L_max, A_min, A_max, B_min, B_max]`. L is normally 0..100, A and B are normally -128..127.
+
+Pass thresholds as a list of LAB ranges:
+
+```python
+threshold = [20, 90, 20, 127, 0, 127]
+thresholds = [threshold]
+```
+
+In tuning mode, show the current mask with `image.binary()` before drawing controls:
 
 ```python
 if ui_state["mode"] == "tuning":
-    img.binary(cfg["thresholds"], invert=False, copy=False)
+    img.binary([cfg["threshold"]], invert=False, copy=False)
     draw_tuning_controls(img, cfg, ui_state)
 ```
 
@@ -110,8 +144,13 @@ Keep algorithm-specific calls easy to swap. Use a detector function with structu
 ```python
 def detect_color(img, cfg):
     roi = cfg["roi"]
-    thresholds = cfg["thresholds"]
-    blobs = img.find_blobs(thresholds, roi=roi, pixels_threshold=cfg["min_pixels"], area_threshold=cfg["min_area"])
+    threshold = cfg["threshold"]
+    blobs = img.find_blobs(
+        [threshold],
+        roi=tuple(roi),
+        pixels_threshold=cfg["min_pixels"],
+        area_threshold=cfg["min_area"],
+    )
     if not blobs:
         return []
     best = max(blobs, key=lambda b: b.pixels())
@@ -119,6 +158,46 @@ def detect_color(img, cfg):
 ```
 
 If a method name or blob property differs on the target firmware, replace it after checking the Image API or running a probe that prints `dir(blob)` or a minimal example.
+
+Cached color-tracking facts:
+
+- `find_blobs` expects a list of thresholds, so pass `[cfg["threshold"]]`, not `cfg["threshold"]`.
+- `roi` should be a four-value rectangle `(x, y, w, h)`; keep it clamped inside the image.
+- `pixels_threshold` filters by matching pixels, and `area_threshold` filters by blob rectangle area.
+- Prefer the blob with the largest `pixels()` for single-target color tracking.
+- Useful blob accessors are commonly `x()`, `y()`, `w()`, `h()`, `cx()`, `cy()`, `pixels()`, `area()`, and `rect()`. If a firmware exposes tuple-style blobs instead, use a tiny probe script or compatibility wrapper.
+
+## Key and Touch Parameter Page Pattern
+
+Use physical keys only for page switching unless the user explicitly asks for key-based numeric editing. Default tuning should be touch-first:
+
+```python
+from maix.peripheral import key
+
+try:
+    key.rm_default_listener()
+except Exception:
+    pass
+
+keys = key.Key()
+key_id, state = keys.read()
+if state == key.State.KEY_PRESSED:
+    if key_id in (key.Keys.KEY_OK, key.Keys.KEY_OPTION):
+        ui_state["mode"] = "params" if ui_state["mode"] == "run" else "run"
+```
+
+Default touch tuning layout:
+
+- Draw every tunable parameter as a bottom box with only a short label.
+- Show the selected parameter's current value on the left side of the screen, outside the bottom boxes.
+- Adapt the number of columns and rows to screen width and parameter count.
+- Touch a bottom box to select the parameter.
+- Draw large `+` and `-` controls on the right side for the selected parameter.
+- Draw a `BIN ON/OFF` toggle at the top-right to switch threshold binary preview.
+- Hide touch raw/mapped debug text by default. Keep it behind a config flag such as `show_touch_debug` for calibration.
+- Keep key handling out of parameter selection and numeric edits unless requested.
+
+Key names to check first for page switching are `KEY_OK` and `KEY_OPTION`. State names to check first are `KEY_PRESSED` and `KEY_LONG_PRESSED`. Use `getattr` fallbacks when generating portable code because firmware builds can expose a smaller key set.
 
 ## AI Code Pattern
 

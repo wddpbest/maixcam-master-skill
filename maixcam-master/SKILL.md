@@ -9,17 +9,18 @@ description: Use when building, debugging, tuning, or reviewing MaixCAM or MaixP
 
 Act as a MaixCAM vision task lead. Do not jump straight to final code. Convert the user's target into a staged recognition experiment, choose the simplest algorithm that can survive the scene, write adaptable MaixPy code, and keep each step verifiable on real hardware.
 
-Prefer official, current sources before relying on memory:
+Prefer this skill's bundled references before browsing. Use official, current sources when the local references do not cover the API, the target firmware may differ, or a device probe/log shows a mismatch:
 
 - MaixPy source and examples: <https://github.com/sipeed/MaixPy>
 - MaixPy docs and API: <https://wiki.sipeed.com/maixpy/>
 - MaixCAM hardware docs: <https://wiki.sipeed.com/hardware/zh/maixcam/>
-- If an API, module, model format, camera option, or board feature is uncertain, search the web and prefer Sipeed official docs, GitHub source, examples, and issues before community posts.
+- If an API, module, model format, camera option, or board feature is already covered in the bundled references, use that cached knowledge first and do not repeat web searches.
+- If an API remains uncertain after checking the bundled references, search the web and prefer Sipeed official docs, GitHub source, examples, and issues before community posts.
 
 Read these references only when needed:
 
 - `references/maixcam-vision-workflow.md` for staged task analysis, algorithm selection, screen-first tuning UI, and validation loops.
-- `references/maixpy-api-map.md` for MaixPy source/API lookup guidance and code patterns.
+- `references/maixpy-api-map.md` for MaixPy source/API lookup guidance, cached API facts, and code patterns.
 
 ## Operating Rules
 
@@ -32,6 +33,7 @@ Read these references only when needed:
 7. Prefer robust pipelines over clever single thresholds: ROI, exposure/white balance control, morphology or contour filtering, temporal smoothing, confidence hysteresis, stale target timeout, and safe fallback output.
 8. Keep MaixPy code hardware-aware: resolution, pixel format, buffer count, model input size, memory pressure, display/touch overhead, serial bandwidth, and FPS budget.
 9. Never claim an API call is correct if it has not been verified against current docs/source. If touch/key/display APIs are uncertain on the target firmware, say so and provide a small probe script.
+10. Confidence gate: if there is less than 95% confidence in the target behavior, hardware API, storage path, or UI flow, keep asking focused questions and proposing checkable probes until the plan is confirmed. Do not silently invent risky behavior.
 
 ## Task Decomposition
 
@@ -71,6 +73,7 @@ Generated MaixPy code should normally include:
 - `read_buttons(ui_state, config)` for built-in button navigation, with at least one button switching between run view and tuning view.
 - `read_touch(ui_state, config)` or `update_tuning(config, input_state)` for touchscreen parameter edits first, UART/config-file edits second.
 - `draw_run_view(img, targets, config, stats)` showing camera frame, ROI, target box, center error, FPS, and current output.
+- Run view capture controls for offline debugging: add `PHOTO` and `REC` touch buttons when useful. Default storage should be `/root/data/image/` for single photos and `/root/data/video/` for recordings; create both folders at startup. For H.264, use `video.Encoder(type=video.VideoType.VIDEO_H264_CBR)` with `image.Format.FMT_YVU420SP` camera frames.
 - `draw_tuning_view(img, targets, config, stats, ui_state)` showing editable thresholds, ROI, area filters, smoothing, lost timeout, and command rate.
 - `command_from_target(target, config)` that bounds robot commands and handles lost targets.
 - Main loop that keeps the program in the foreground, reads camera/input every frame, draws the current view, sends rate-limited output, and exits gracefully.
@@ -147,3 +150,4 @@ For every delivered solution, include:
 | Ignoring display cost | Allow overlay density to be reduced during speed tests |
 | Defaulting to serial-only tuning on MaixCAM | Prefer foreground run/tuning views with touchscreen and buttons, keep UART as fallback |
 | Hard-coding one lab scene | Keep config editable and document the tuning order |
+| Building vision apps without capture tools | Add photo and recording controls so real frames can be collected for offline debugging |
