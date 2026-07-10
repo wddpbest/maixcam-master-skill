@@ -1,0 +1,1219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Color Threshold Tuner</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111417;
+      --panel: #1d242b;
+      --panel-2: #26313a;
+      --line: #42515e;
+      --text: #d2e7d0;
+      --muted: #9cb7bd;
+      --value: #e4d45c;
+      --accent: #62c07b;
+      --warn: #df6b66;
+      --blue: #6aa2d8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) 390px;
+      min-height: 100vh;
+    }
+
+    .viewer {
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .sidebar {
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      padding: 14px;
+      overflow: auto;
+      max-height: 100vh;
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .canvas-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .canvas-pane {
+      min-width: 0;
+    }
+
+    .canvas-title {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    canvas {
+      width: 100%;
+      max-height: calc(100vh - 170px);
+      aspect-ratio: 4 / 3;
+      background: #080a0c;
+      border: 1px solid var(--line);
+      display: block;
+      image-rendering: auto;
+    }
+
+    video {
+      display: none;
+    }
+
+    section {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 10px;
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    h2 {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0 0 8px;
+      font-weight: 650;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 12px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    select,
+    input[type="number"],
+    button,
+    textarea {
+      border: 1px solid var(--line);
+      background: #151a1f;
+      color: var(--text);
+      border-radius: 5px;
+      font: inherit;
+      font-size: 13px;
+    }
+
+    select,
+    input[type="number"] {
+      min-height: 30px;
+      padding: 4px 7px;
+    }
+
+    button {
+      min-height: 32px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button.warn {
+      border-color: var(--warn);
+      color: var(--warn);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .triple {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .statline {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .statline strong {
+      color: var(--value);
+      font-weight: 650;
+    }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 60px 60px;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .slider-row span {
+      color: var(--value);
+      font-size: 12px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      padding: 8px;
+      resize: vertical;
+      color: var(--value);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        max-height: none;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .canvas-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="viewer">
+      <div class="topbar">
+        <button id="prevBtn" title="上一张或视频后退">Prev</button>
+        <button id="playBtn" class="primary" title="播放图片序列或视频">Play</button>
+        <button id="nextBtn" title="下一张或视频前进">Next</button>
+        <button id="fitRoiBtn" title="ROI 回到整幅画面">Full ROI</button>
+        <span class="statline" id="mediaStatus">No media loaded</span>
+      </div>
+      <div class="canvas-grid">
+        <div class="canvas-pane">
+          <div class="canvas-title">Original + ROI + best component</div>
+          <canvas id="originalCanvas" width="320" height="240"></canvas>
+        </div>
+        <div class="canvas-pane">
+          <div class="canvas-title">Binary mask from selected threshold</div>
+          <canvas id="maskCanvas" width="320" height="240"></canvas>
+        </div>
+      </div>
+      <video id="video" muted playsinline></video>
+    </div>
+
+    <aside class="sidebar">
+      <h1>Color Threshold Tuner</h1>
+
+      <section>
+        <h2>Media</h2>
+        <div class="row">
+          <div>
+            <label for="imageFolder">Image folder</label>
+            <input id="imageFolder" type="file" accept="image/*" webkitdirectory multiple>
+          </div>
+          <div>
+            <label for="videoFile">Video file</label>
+            <input id="videoFile" type="file" accept="video/*">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="processWidth">Process width</label>
+            <input id="processWidth" type="number" min="32" max="1920" value="320">
+          </div>
+          <div>
+            <label for="processHeight">Process height</label>
+            <input id="processHeight" type="number" min="32" max="1080" value="240">
+          </div>
+        </div>
+        <div class="hint">MaixCAM 当前脚本默认 320x240。工具会把图片或视频缩放到这里再计算阈值。</div>
+      </section>
+
+      <section>
+        <h2>Color Space</h2>
+        <div class="row">
+          <div>
+            <label for="spaceSelect">Space</label>
+            <select id="spaceSelect">
+              <option value="LAB">LAB (Maix find_blobs)</option>
+              <option value="HSV">HSV</option>
+              <option value="RGB">RGB</option>
+              <option value="YCrCb">YCrCb</option>
+              <option value="GRAY">GRAY</option>
+            </select>
+          </div>
+          <div>
+            <label for="autoMargin">Auto margin</label>
+            <input id="autoMargin" type="number" min="0" max="80" value="10">
+          </div>
+        </div>
+        <div class="buttons">
+          <button id="learnRoiBtn">Learn From ROI</button>
+          <button id="resetThresholdBtn">Reset Threshold</button>
+        </div>
+        <div id="thresholdControls"></div>
+      </section>
+
+      <section>
+        <h2>ROI</h2>
+        <div id="roiControls"></div>
+      </section>
+
+      <section>
+        <h2>Blob Filter</h2>
+        <div class="triple">
+          <div>
+            <label for="minPixels">Min pixels</label>
+            <input id="minPixels" type="number" min="0" max="999999" value="150">
+          </div>
+          <div>
+            <label for="minArea">Min area</label>
+            <input id="minArea" type="number" min="0" max="999999" value="150">
+          </div>
+          <div>
+            <label for="maxArea">Max area</label>
+            <input id="maxArea" type="number" min="1" max="999999" value="76800">
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Result</h2>
+        <div class="statline" id="resultText">No result</div>
+      </section>
+
+      <section>
+        <h2>Export</h2>
+        <div class="buttons">
+          <button id="exportBtn" class="primary">Download JSON</button>
+          <button id="copyBtn">Copy JSON</button>
+        </div>
+        <textarea id="jsonOutput" spellcheck="false"></textarea>
+        <div class="hint">LAB 导出的 JSON 可直接作为 `/root/color_blob_config.json` 给当前 MaixCAM 脚本使用。其他颜色空间用于离线分析，板端代码也要支持对应空间才可直接使用。</div>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    "use strict";
+
+    const SPACES = {
+      RGB: {
+        labels: ["R", "G", "B"],
+        ranges: [[0, 255], [0, 255], [0, 255]],
+        defaults: [[0, 255], [0, 255], [0, 255]],
+      },
+      HSV: {
+        labels: ["H", "S", "V"],
+        ranges: [[0, 179], [0, 255], [0, 255]],
+        defaults: [[0, 179], [40, 255], [40, 255]],
+      },
+      LAB: {
+        labels: ["L", "A", "B"],
+        ranges: [[0, 100], [-128, 127], [-128, 127]],
+        defaults: [[20, 90], [20, 127], [0, 127]],
+      },
+      YCrCb: {
+        labels: ["Y", "Cr", "Cb"],
+        ranges: [[0, 255], [0, 255], [0, 255]],
+        defaults: [[0, 255], [0, 255], [0, 255]],
+      },
+      GRAY: {
+        labels: ["Y"],
+        ranges: [[0, 255]],
+        defaults: [[0, 255]],
+      },
+    };
+
+    const state = {
+      items: [],
+      index: 0,
+      mode: "images",
+      image: new Image(),
+      imageReady: false,
+      videoReady: false,
+      playing: false,
+      processWidth: 320,
+      processHeight: 240,
+      space: "LAB",
+      thresholds: {},
+      roi: { x: 0, y: 0, w: 320, h: 240 },
+      mask: null,
+      best: null,
+      stats: { components: 0, pixels: 0 },
+      animationId: 0,
+      imageTimer: 0,
+      renderPending: false,
+      frameVersion: 0,
+      renderedFrameVersion: -1,
+      sourceFrame: null,
+      channelCache: { space: "", frameVersion: -1, data: null },
+    };
+
+    const el = {
+      originalCanvas: document.getElementById("originalCanvas"),
+      maskCanvas: document.getElementById("maskCanvas"),
+      video: document.getElementById("video"),
+      imageFolder: document.getElementById("imageFolder"),
+      videoFile: document.getElementById("videoFile"),
+      prevBtn: document.getElementById("prevBtn"),
+      playBtn: document.getElementById("playBtn"),
+      nextBtn: document.getElementById("nextBtn"),
+      fitRoiBtn: document.getElementById("fitRoiBtn"),
+      mediaStatus: document.getElementById("mediaStatus"),
+      processWidth: document.getElementById("processWidth"),
+      processHeight: document.getElementById("processHeight"),
+      spaceSelect: document.getElementById("spaceSelect"),
+      autoMargin: document.getElementById("autoMargin"),
+      learnRoiBtn: document.getElementById("learnRoiBtn"),
+      resetThresholdBtn: document.getElementById("resetThresholdBtn"),
+      thresholdControls: document.getElementById("thresholdControls"),
+      roiControls: document.getElementById("roiControls"),
+      minPixels: document.getElementById("minPixels"),
+      minArea: document.getElementById("minArea"),
+      maxArea: document.getElementById("maxArea"),
+      resultText: document.getElementById("resultText"),
+      exportBtn: document.getElementById("exportBtn"),
+      copyBtn: document.getElementById("copyBtn"),
+      jsonOutput: document.getElementById("jsonOutput"),
+    };
+
+    const originalCtx = el.originalCanvas.getContext("2d", { willReadFrequently: true });
+    const maskCtx = el.maskCanvas.getContext("2d", { willReadFrequently: true });
+    const workCanvas = document.createElement("canvas");
+    const workCtx = workCanvas.getContext("2d", { willReadFrequently: true });
+
+    for (const key of Object.keys(SPACES)) {
+      state.thresholds[key] = SPACES[key].defaults.map(pair => pair.slice());
+    }
+
+    function clamp(value, low, high) {
+      return Math.max(low, Math.min(high, value));
+    }
+
+    function asInt(value, fallback) {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function resizeCanvases() {
+      state.processWidth = clamp(asInt(el.processWidth.value, 320), 32, 1920);
+      state.processHeight = clamp(asInt(el.processHeight.value, 240), 32, 1080);
+      el.processWidth.value = state.processWidth;
+      el.processHeight.value = state.processHeight;
+
+      for (const canvas of [el.originalCanvas, el.maskCanvas, workCanvas]) {
+        canvas.width = state.processWidth;
+        canvas.height = state.processHeight;
+      }
+      state.roi.x = clamp(state.roi.x, 0, state.processWidth - 1);
+      state.roi.y = clamp(state.roi.y, 0, state.processHeight - 1);
+      state.roi.w = clamp(state.roi.w, 1, state.processWidth - state.roi.x);
+      state.roi.h = clamp(state.roi.h, 1, state.processHeight - state.roi.y);
+      el.maxArea.value = Math.max(asInt(el.maxArea.value, state.processWidth * state.processHeight), 1);
+      state.sourceFrame = null;
+      state.renderedFrameVersion = -1;
+      invalidateChannelCache();
+      renderRoiControls();
+      requestRender();
+    }
+
+    function requestRender() {
+      if (state.renderPending) return;
+      state.renderPending = true;
+      requestAnimationFrame(() => {
+        state.renderPending = false;
+        renderFrame();
+      });
+    }
+
+    function invalidateChannelCache() {
+      state.channelCache = { space: "", frameVersion: -1, data: null };
+    }
+
+    function thresholdFlat(space = state.space) {
+      const values = state.thresholds[space] || [];
+      return values.flatMap(pair => [Math.round(pair[0]), Math.round(pair[1])]);
+    }
+
+    function renderThresholdControls() {
+      const spec = SPACES[state.space];
+      el.thresholdControls.innerHTML = "";
+      spec.labels.forEach((label, channel) => {
+        const [low, high] = spec.ranges[channel];
+        const pair = state.thresholds[state.space][channel];
+        const minRow = thresholdRow(label + "-", state.space, channel, 0, low, high, pair[0]);
+        const maxRow = thresholdRow(label + "+", state.space, channel, 1, low, high, pair[1]);
+        el.thresholdControls.append(minRow, maxRow);
+      });
+      updateJson();
+    }
+
+    function syncThresholdControlValues() {
+      const rows = el.thresholdControls.querySelectorAll("[data-kind='threshold']");
+      rows.forEach(row => {
+        const space = row.dataset.space;
+        const channel = asInt(row.dataset.channel, 0);
+        const side = asInt(row.dataset.side, 0);
+        const pair = state.thresholds[space][channel];
+        const value = pair[side];
+        const slider = row.querySelector("input[type='range']");
+        const number = row.querySelector("input[type='number']");
+        const valueText = row.querySelector("[data-role='value']");
+        if (slider) slider.value = value;
+        if (number) number.value = value;
+        if (valueText) valueText.textContent = String(value);
+      });
+    }
+
+    function thresholdRow(label, space, channel, side, low, high, value) {
+      const row = document.createElement("div");
+      row.className = "slider-row";
+      row.dataset.kind = "threshold";
+      row.dataset.space = space;
+      row.dataset.channel = String(channel);
+      row.dataset.side = String(side);
+
+      const name = document.createElement("span");
+      name.textContent = label;
+
+      const slider = document.createElement("input");
+      slider.type = "range";
+      slider.min = low;
+      slider.max = high;
+      slider.step = 1;
+      slider.value = value;
+
+      const number = document.createElement("input");
+      number.type = "number";
+      number.min = low;
+      number.max = high;
+      number.step = 1;
+      number.value = value;
+
+      const valueText = document.createElement("span");
+      valueText.dataset.role = "value";
+      valueText.textContent = String(value);
+
+      function setValue(raw) {
+        let next = clamp(asInt(raw, value), low, high);
+        const pair = state.thresholds[space][channel];
+        pair[side] = next;
+        if (pair[0] > pair[1]) {
+          if (side === 0) pair[1] = pair[0];
+          else pair[0] = pair[1];
+        }
+        syncThresholdControlValues();
+        updateJson();
+        requestRender();
+      }
+
+      slider.addEventListener("input", event => setValue(event.target.value));
+      number.addEventListener("change", event => setValue(event.target.value));
+
+      row.append(name, slider, number, valueText);
+      return row;
+    }
+
+    function renderRoiControls() {
+      el.roiControls.innerHTML = "";
+      const controls = [
+        ["R-X", "x", 0, state.processWidth - 1],
+        ["R-Y", "y", 0, state.processHeight - 1],
+        ["R-W", "w", 1, state.processWidth],
+        ["R-H", "h", 1, state.processHeight],
+      ];
+
+      controls.forEach(([label, key, low, high]) => {
+        const row = document.createElement("div");
+        row.className = "slider-row";
+        row.dataset.kind = "roi";
+        row.dataset.key = key;
+        const name = document.createElement("span");
+        name.textContent = label;
+        const slider = document.createElement("input");
+        slider.type = "range";
+        slider.min = low;
+        slider.max = high;
+        slider.step = 1;
+        slider.value = state.roi[key];
+        const number = document.createElement("input");
+        number.type = "number";
+        number.min = low;
+        number.max = high;
+        number.step = 1;
+        number.value = state.roi[key];
+        const valueText = document.createElement("span");
+        valueText.dataset.role = "value";
+        valueText.textContent = String(state.roi[key]);
+        function setValue(raw) {
+          state.roi[key] = asInt(raw, state.roi[key]);
+          normalizeRoi();
+          syncRoiControlValues();
+          updateJson();
+          requestRender();
+        }
+        slider.addEventListener("input", event => setValue(event.target.value));
+        number.addEventListener("change", event => setValue(event.target.value));
+        row.append(name, slider, number, valueText);
+        el.roiControls.append(row);
+      });
+    }
+
+    function syncRoiControlValues() {
+      const limits = {
+        x: [0, state.processWidth - 1],
+        y: [0, state.processHeight - 1],
+        w: [1, state.processWidth - state.roi.x],
+        h: [1, state.processHeight - state.roi.y],
+      };
+      const rows = el.roiControls.querySelectorAll("[data-kind='roi']");
+      rows.forEach(row => {
+        const key = row.dataset.key;
+        const slider = row.querySelector("input[type='range']");
+        const number = row.querySelector("input[type='number']");
+        const valueText = row.querySelector("[data-role='value']");
+        const [low, high] = limits[key] || [0, 1];
+        if (slider) {
+          slider.min = low;
+          slider.max = high;
+          slider.value = state.roi[key];
+        }
+        if (number) {
+          number.min = low;
+          number.max = high;
+          number.value = state.roi[key];
+        }
+        if (valueText) valueText.textContent = String(state.roi[key]);
+      });
+    }
+
+    function normalizeRoi() {
+      state.roi.x = clamp(asInt(state.roi.x, 0), 0, state.processWidth - 1);
+      state.roi.y = clamp(asInt(state.roi.y, 0), 0, state.processHeight - 1);
+      state.roi.w = clamp(asInt(state.roi.w, state.processWidth), 1, state.processWidth - state.roi.x);
+      state.roi.h = clamp(asInt(state.roi.h, state.processHeight), 1, state.processHeight - state.roi.y);
+    }
+
+    function fitRoi() {
+      state.roi = { x: 0, y: 0, w: state.processWidth, h: state.processHeight };
+      syncRoiControlValues();
+      updateJson();
+      requestRender();
+    }
+
+    function resetThreshold() {
+      state.thresholds[state.space] = SPACES[state.space].defaults.map(pair => pair.slice());
+      renderThresholdControls();
+      requestRender();
+    }
+
+    function loadImageFolder(files) {
+      cleanupUrls();
+      state.mode = "images";
+      state.items = Array.from(files)
+        .filter(file => file.type.startsWith("image/"))
+        .sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name))
+        .map(file => ({
+          file,
+          url: URL.createObjectURL(file),
+          name: file.webkitRelativePath || file.name,
+        }));
+      state.index = 0;
+      state.playing = false;
+      el.playBtn.textContent = "Play";
+      if (state.items.length) {
+        loadCurrentImage();
+      } else {
+        updateMediaStatus("No image files in folder");
+      }
+    }
+
+    function cleanupUrls() {
+      for (const item of state.items) {
+        if (item.url) URL.revokeObjectURL(item.url);
+      }
+      state.items = [];
+    }
+
+    function loadCurrentImage() {
+      if (!state.items.length) return;
+      const item = state.items[state.index];
+      state.imageReady = false;
+      state.image.onload = () => {
+        state.imageReady = true;
+        updateMediaStatus();
+        state.sourceFrame = null;
+        requestRender();
+      };
+      state.image.src = item.url;
+    }
+
+    function loadVideo(file) {
+      cleanupUrls();
+      state.mode = "video";
+      state.playing = false;
+      state.videoReady = false;
+      el.playBtn.textContent = "Play";
+      const url = URL.createObjectURL(file);
+      state.items = [{ file, url, name: file.name }];
+      el.video.onloadeddata = () => {
+        state.videoReady = true;
+        updateMediaStatus();
+        state.sourceFrame = null;
+        requestRender();
+      };
+      el.video.ontimeupdate = () => {
+        if (!state.playing) {
+          state.sourceFrame = null;
+          requestRender();
+        }
+        updateMediaStatus();
+      };
+      el.video.onended = () => {
+        state.playing = false;
+        el.playBtn.textContent = "Play";
+      };
+      el.video.src = url;
+      el.video.load();
+    }
+
+    function prevFrame() {
+      if (state.mode === "images" && state.items.length) {
+        state.index = (state.index - 1 + state.items.length) % state.items.length;
+        loadCurrentImage();
+      } else if (state.mode === "video" && state.videoReady) {
+        el.video.currentTime = Math.max(0, el.video.currentTime - 1 / 15);
+        state.sourceFrame = null;
+        requestRender();
+      }
+    }
+
+    function nextFrame() {
+      if (state.mode === "images" && state.items.length) {
+        state.index = (state.index + 1) % state.items.length;
+        loadCurrentImage();
+      } else if (state.mode === "video" && state.videoReady) {
+        el.video.currentTime = Math.min(el.video.duration || el.video.currentTime, el.video.currentTime + 1 / 15);
+        state.sourceFrame = null;
+        requestRender();
+      }
+    }
+
+    function playMedia() {
+      state.playing = !state.playing;
+      el.playBtn.textContent = state.playing ? "Pause" : "Play";
+      if (state.mode === "images") {
+        if (state.playing) {
+          state.imageTimer = window.setInterval(nextFrame, 500);
+        } else {
+          window.clearInterval(state.imageTimer);
+        }
+      } else if (state.mode === "video" && state.videoReady) {
+        if (state.playing) {
+          el.video.play();
+          animateVideo();
+        } else {
+          el.video.pause();
+          cancelAnimationFrame(state.animationId);
+        }
+      }
+    }
+
+    function animateVideo() {
+      if (!state.playing || state.mode !== "video") return;
+      state.sourceFrame = null;
+      renderFrame();
+      state.animationId = requestAnimationFrame(animateVideo);
+    }
+
+    function drawSourceToWork() {
+      workCtx.clearRect(0, 0, state.processWidth, state.processHeight);
+      if (state.mode === "video" && state.videoReady) {
+        workCtx.drawImage(el.video, 0, 0, state.processWidth, state.processHeight);
+        state.sourceFrame = null;
+        return true;
+      }
+      if (state.mode === "images" && state.imageReady) {
+        workCtx.drawImage(state.image, 0, 0, state.processWidth, state.processHeight);
+        return true;
+      }
+      return false;
+    }
+
+    function updateSourceFrame() {
+      if (state.mode === "images" && state.sourceFrame && state.renderedFrameVersion === state.frameVersion) {
+        return true;
+      }
+      if (!drawSourceToWork()) return false;
+      state.sourceFrame = workCtx.getImageData(0, 0, state.processWidth, state.processHeight);
+      state.frameVersion += 1;
+      state.renderedFrameVersion = state.frameVersion;
+      invalidateChannelCache();
+      return true;
+    }
+
+    function renderFrame() {
+      if (!updateSourceFrame()) {
+        clearCanvases();
+        updateJson();
+        return;
+      }
+      const frame = state.sourceFrame;
+      const analysis = buildMask();
+      state.mask = analysis.mask;
+      state.stats = analysis.stats;
+      state.best = findComponents(analysis.mask, state.processWidth, state.processHeight);
+      drawOriginal(frame);
+      drawMask(analysis.mask);
+      updateResult();
+      updateJson();
+    }
+
+    function clearCanvases() {
+      originalCtx.clearRect(0, 0, state.processWidth, state.processHeight);
+      maskCtx.clearRect(0, 0, state.processWidth, state.processHeight);
+    }
+
+    function ensureChannelCache() {
+      if (
+        state.channelCache.data &&
+        state.channelCache.space === state.space &&
+        state.channelCache.frameVersion === state.frameVersion
+      ) {
+        return state.channelCache.data;
+      }
+      const width = state.processWidth;
+      const height = state.processHeight;
+      const source = state.sourceFrame.data;
+      const channelCount = SPACES[state.space].labels.length;
+      const converted = new Int16Array(width * height * channelCount);
+      for (let idx = 0; idx < width * height; idx++) {
+        const offset = idx * 4;
+        const values = convertPixel(source[offset], source[offset + 1], source[offset + 2], state.space);
+        const base = idx * channelCount;
+        for (let channel = 0; channel < channelCount; channel++) {
+          converted[base + channel] = values[channel];
+        }
+      }
+      state.channelCache = {
+        space: state.space,
+        frameVersion: state.frameVersion,
+        data: { values: converted, channelCount },
+      };
+      return state.channelCache.data;
+    }
+
+    function buildMask() {
+      const width = state.processWidth;
+      const height = state.processHeight;
+      const mask = new Uint8Array(width * height);
+      const roi = state.roi;
+      const thresholds = state.thresholds[state.space];
+      const cache = ensureChannelCache();
+      const values = cache.values;
+      const channelCount = cache.channelCount;
+      let pixels = 0;
+
+      for (let y = roi.y; y < roi.y + roi.h; y++) {
+        for (let x = roi.x; x < roi.x + roi.w; x++) {
+          const idx = y * width + x;
+          let ok = true;
+          for (let i = 0; i < thresholds.length; i++) {
+            const value = values[idx * channelCount + i];
+            if (value < thresholds[i][0] || value > thresholds[i][1]) {
+              ok = false;
+              break;
+            }
+          }
+          if (ok) {
+            mask[idx] = 1;
+            pixels += 1;
+          }
+        }
+      }
+      return { mask, stats: { pixels } };
+    }
+
+    function convertPixel(r, g, b, space) {
+      if (space === "RGB") return [r, g, b];
+      if (space === "HSV") return rgbToHsv(r, g, b);
+      if (space === "LAB") return rgbToLab(r, g, b);
+      if (space === "YCrCb") return rgbToYCrCb(r, g, b);
+      return [Math.round(0.299 * r + 0.587 * g + 0.114 * b)];
+    }
+
+    function rgbToHsv(r, g, b) {
+      const rn = r / 255;
+      const gn = g / 255;
+      const bn = b / 255;
+      const max = Math.max(rn, gn, bn);
+      const min = Math.min(rn, gn, bn);
+      const delta = max - min;
+      let h = 0;
+      if (delta !== 0) {
+        if (max === rn) h = ((gn - bn) / delta) % 6;
+        else if (max === gn) h = (bn - rn) / delta + 2;
+        else h = (rn - gn) / delta + 4;
+        h *= 60;
+        if (h < 0) h += 360;
+      }
+      const s = max === 0 ? 0 : delta / max;
+      return [Math.round(h / 2), Math.round(s * 255), Math.round(max * 255)];
+    }
+
+    function pivotRgb(v) {
+      const n = v / 255;
+      return n <= 0.04045 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4);
+    }
+
+    function pivotXyz(v) {
+      return v > 0.008856 ? Math.cbrt(v) : (7.787 * v) + (16 / 116);
+    }
+
+    function rgbToLab(r, g, b) {
+      const rn = pivotRgb(r);
+      const gn = pivotRgb(g);
+      const bn = pivotRgb(b);
+      const x = (0.4124564 * rn + 0.3575761 * gn + 0.1804375 * bn) / 0.95047;
+      const y = (0.2126729 * rn + 0.7151522 * gn + 0.0721750 * bn) / 1.00000;
+      const z = (0.0193339 * rn + 0.1191920 * gn + 0.9503041 * bn) / 1.08883;
+      const fx = pivotXyz(x);
+      const fy = pivotXyz(y);
+      const fz = pivotXyz(z);
+      const l = (116 * fy) - 16;
+      const a = 500 * (fx - fy);
+      const bb = 200 * (fy - fz);
+      return [
+        Math.round(clamp(l, 0, 100)),
+        Math.round(clamp(a, -128, 127)),
+        Math.round(clamp(bb, -128, 127)),
+      ];
+    }
+
+    function rgbToYCrCb(r, g, b) {
+      const y = 0.299 * r + 0.587 * g + 0.114 * b;
+      const cr = (r - y) * 0.713 + 128;
+      const cb = (b - y) * 0.564 + 128;
+      return [Math.round(y), Math.round(clamp(cr, 0, 255)), Math.round(clamp(cb, 0, 255))];
+    }
+
+    function findComponents(mask, width, height) {
+      const visited = new Uint8Array(mask.length);
+      const queue = new Int32Array(mask.length);
+      const minPixels = Math.max(0, asInt(el.minPixels.value, 0));
+      const minArea = Math.max(0, asInt(el.minArea.value, 0));
+      const maxArea = Math.max(1, asInt(el.maxArea.value, width * height));
+      let best = null;
+      let componentCount = 0;
+
+      for (let i = 0; i < mask.length; i++) {
+        if (!mask[i] || visited[i]) continue;
+        let head = 0;
+        let tail = 0;
+        let pixels = 0;
+        let minX = width;
+        let minY = height;
+        let maxX = 0;
+        let maxY = 0;
+        visited[i] = 1;
+        queue[tail++] = i;
+
+        while (head < tail) {
+          const idx = queue[head++];
+          const x = idx % width;
+          const y = Math.floor(idx / width);
+          pixels += 1;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+
+          const left = idx - 1;
+          const right = idx + 1;
+          const up = idx - width;
+          const down = idx + width;
+          if (x > 0 && mask[left] && !visited[left]) {
+            visited[left] = 1;
+            queue[tail++] = left;
+          }
+          if (x < width - 1 && mask[right] && !visited[right]) {
+            visited[right] = 1;
+            queue[tail++] = right;
+          }
+          if (y > 0 && mask[up] && !visited[up]) {
+            visited[up] = 1;
+            queue[tail++] = up;
+          }
+          if (y < height - 1 && mask[down] && !visited[down]) {
+            visited[down] = 1;
+            queue[tail++] = down;
+          }
+        }
+
+        componentCount += 1;
+        const w = maxX - minX + 1;
+        const h = maxY - minY + 1;
+        const area = w * h;
+        if (pixels < minPixels || area < minArea || area > maxArea) continue;
+        const candidate = {
+          x: minX,
+          y: minY,
+          w,
+          h,
+          pixels,
+          area,
+          cx: Math.round(minX + w / 2),
+          cy: Math.round(minY + h / 2),
+        };
+        if (!best || candidate.pixels > best.pixels) best = candidate;
+      }
+      state.stats.components = componentCount;
+      return best;
+    }
+
+    function drawOriginal(frame) {
+      originalCtx.putImageData(frame, 0, 0);
+      const roi = state.roi;
+      originalCtx.lineWidth = 2;
+      originalCtx.strokeStyle = "#6aa2d8";
+      originalCtx.strokeRect(roi.x + 0.5, roi.y + 0.5, roi.w, roi.h);
+      if (state.best) {
+        originalCtx.strokeStyle = "#62c07b";
+        originalCtx.strokeRect(state.best.x + 0.5, state.best.y + 0.5, state.best.w, state.best.h);
+        originalCtx.beginPath();
+        originalCtx.moveTo(state.best.cx - 8, state.best.cy);
+        originalCtx.lineTo(state.best.cx + 8, state.best.cy);
+        originalCtx.moveTo(state.best.cx, state.best.cy - 8);
+        originalCtx.lineTo(state.best.cx, state.best.cy + 8);
+        originalCtx.stroke();
+      }
+    }
+
+    function drawMask(mask) {
+      const width = state.processWidth;
+      const height = state.processHeight;
+      const img = maskCtx.createImageData(width, height);
+      for (let i = 0; i < mask.length; i++) {
+        const v = mask[i] ? 255 : 0;
+        const offset = i * 4;
+        img.data[offset] = v;
+        img.data[offset + 1] = v;
+        img.data[offset + 2] = v;
+        img.data[offset + 3] = 255;
+      }
+      maskCtx.putImageData(img, 0, 0);
+      const roi = state.roi;
+      maskCtx.lineWidth = 2;
+      maskCtx.strokeStyle = "#6aa2d8";
+      maskCtx.strokeRect(roi.x + 0.5, roi.y + 0.5, roi.w, roi.h);
+      if (state.best) {
+        maskCtx.strokeStyle = "#df6b66";
+        maskCtx.strokeRect(state.best.x + 0.5, state.best.y + 0.5, state.best.w, state.best.h);
+      }
+    }
+
+    function learnFromRoi() {
+      if (state.mode === "video") state.sourceFrame = null;
+      if (!updateSourceFrame()) return;
+      const frame = state.sourceFrame;
+      const spec = SPACES[state.space];
+      const mins = spec.ranges.map(pair => pair[1]);
+      const maxs = spec.ranges.map(pair => pair[0]);
+      const roi = state.roi;
+      const margin = Math.max(0, asInt(el.autoMargin.value, 10));
+      let count = 0;
+
+      for (let y = roi.y; y < roi.y + roi.h; y++) {
+        for (let x = roi.x; x < roi.x + roi.w; x++) {
+          const offset = (y * state.processWidth + x) * 4;
+          const values = convertPixel(frame.data[offset], frame.data[offset + 1], frame.data[offset + 2], state.space);
+          values.forEach((value, index) => {
+            if (value < mins[index]) mins[index] = value;
+            if (value > maxs[index]) maxs[index] = value;
+          });
+          count += 1;
+        }
+      }
+      if (!count) return;
+      state.thresholds[state.space] = mins.map((minValue, index) => {
+        const [low, high] = spec.ranges[index];
+        return [
+          clamp(minValue - margin, low, high),
+          clamp(maxs[index] + margin, low, high),
+        ];
+      });
+      renderThresholdControls();
+      requestRender();
+    }
+
+    function updateResult() {
+      const parts = [];
+      parts.push("mask pixels: <strong>" + state.stats.pixels + "</strong>");
+      parts.push("components: <strong>" + state.stats.components + "</strong>");
+      if (state.best) {
+        parts.push("best: <strong>x=" + state.best.x + " y=" + state.best.y + " w=" + state.best.w + " h=" + state.best.h + "</strong>");
+        parts.push("pixels: <strong>" + state.best.pixels + "</strong>");
+        parts.push("area: <strong>" + state.best.area + "</strong>");
+      } else {
+        parts.push("best: <strong>none</strong>");
+      }
+      el.resultText.innerHTML = parts.join("<br>");
+    }
+
+    function updateMediaStatus(message) {
+      if (message) {
+        el.mediaStatus.textContent = message;
+        return;
+      }
+      if (state.mode === "images") {
+        const item = state.items[state.index];
+        el.mediaStatus.textContent = state.items.length
+          ? (state.index + 1) + "/" + state.items.length + " " + item.name
+          : "No images loaded";
+      } else if (state.mode === "video") {
+        const duration = Number.isFinite(el.video.duration) ? el.video.duration : 0;
+        el.mediaStatus.textContent = state.items.length
+          ? state.items[0].name + " " + el.video.currentTime.toFixed(2) + "/" + duration.toFixed(2) + "s"
+          : "No video loaded";
+      }
+    }
+
+    function currentConfig() {
+      return {
+        width: state.processWidth,
+        height: state.processHeight,
+        color_space: state.space,
+        threshold: thresholdFlat(),
+        roi: [state.roi.x, state.roi.y, state.roi.w, state.roi.h],
+        min_pixels: Math.max(0, asInt(el.minPixels.value, 150)),
+        min_area: Math.max(0, asInt(el.minArea.value, 150)),
+        max_area: Math.max(1, asInt(el.maxArea.value, state.processWidth * state.processHeight)),
+        auto_margin: Math.max(0, asInt(el.autoMargin.value, 10)),
+      };
+    }
+
+    function updateJson() {
+      el.jsonOutput.value = JSON.stringify(currentConfig(), null, 2);
+    }
+
+    function downloadJson() {
+      const blob = new Blob([el.jsonOutput.value + "\n"], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "color_blob_config.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function copyJson() {
+      try {
+        await navigator.clipboard.writeText(el.jsonOutput.value);
+      } catch (err) {
+        el.jsonOutput.select();
+        document.execCommand("copy");
+      }
+    }
+
+    el.imageFolder.addEventListener("change", event => loadImageFolder(event.target.files));
+    el.videoFile.addEventListener("change", event => {
+      const file = event.target.files && event.target.files[0];
+      if (file) loadVideo(file);
+    });
+    el.prevBtn.addEventListener("click", prevFrame);
+    el.nextBtn.addEventListener("click", nextFrame);
+    el.playBtn.addEventListener("click", playMedia);
+    el.fitRoiBtn.addEventListener("click", fitRoi);
+    el.processWidth.addEventListener("change", resizeCanvases);
+    el.processHeight.addEventListener("change", resizeCanvases);
+    el.spaceSelect.addEventListener("change", event => {
+      state.space = event.target.value;
+      renderThresholdControls();
+      requestRender();
+    });
+    el.learnRoiBtn.addEventListener("click", learnFromRoi);
+    el.resetThresholdBtn.addEventListener("click", resetThreshold);
+    el.minPixels.addEventListener("change", requestRender);
+    el.minArea.addEventListener("change", requestRender);
+    el.maxArea.addEventListener("change", requestRender);
+    el.autoMargin.addEventListener("change", updateJson);
+    el.exportBtn.addEventListener("click", downloadJson);
+    el.copyBtn.addEventListener("click", copyJson);
+
+    resizeCanvases();
+    renderThresholdControls();
+    renderRoiControls();
+    updateMediaStatus();
+    updateJson();
+  </script>
+</body>
+</html>

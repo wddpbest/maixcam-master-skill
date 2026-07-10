@@ -21,6 +21,8 @@ Read these references only when needed:
 
 - `references/maixcam-vision-workflow.md` for staged task analysis, algorithm selection, screen-first tuning UI, and validation loops.
 - `references/maixpy-api-map.md` for MaixPy source/API lookup guidance, cached API facts, and code patterns.
+- `references/on-device-tuning-ui-template.md` when preserving the compact RUN/TUNE interface while swapping thresholds for another set of tunable variables.
+- `tools/color_threshold_tuner.html` for offline color-threshold tuning from image folders or videos across LAB, HSV, RGB, YCrCb, and grayscale.
 
 ## Operating Rules
 
@@ -70,12 +72,14 @@ Generated MaixPy code should normally include:
 - `open_camera(config)` and `open_outputs(config)` helpers for display, touchscreen, keys, UART, and optional logs.
 - `detect(img, config)` returning structured target records.
 - `ui_state` with `mode` defaulting to `run`, plus selected parameter/page state for the tuning view.
+- A reusable `TUNABLE_PARAMS` path table for on-device fields. Keep drawing, hit testing, save/restore, and `+/-` editing generic; change the table and task normalizer when the tunable variables change. Read `references/on-device-tuning-ui-template.md` for the fixed contract.
 - `read_buttons(ui_state, config)` for built-in button navigation, with at least one button switching between run view and tuning view.
 - `read_touch(ui_state, config)` or `update_tuning(config, input_state)` for touchscreen parameter edits first, UART/config-file edits second.
 - `draw_run_view(img, targets, config, stats)` showing camera frame, ROI, target box, center error, FPS, and current output.
-- Run view capture controls for offline debugging: add `PHOTO` and `REC` touch buttons when useful. Default storage should be `/root/data/image/` for single photos and `/root/data/video/` for recordings; create both folders at startup. For H.264, use `video.Encoder(type=video.VideoType.VIDEO_H264_CBR)` with `image.Format.FMT_YVU420SP` camera frames.
+- Keep dataset capture separate from the production run/tune program. Use a dedicated `capture_dataset.py` with `CAP`, `TAG`, and optional `REC` controls; store images under `/root/data/image/{pos,neg,bg}/` and H.264 files under `/root/data/video/`. Do not add photo/record buttons to the production run view unless the user explicitly requests them. For H.264, convert frames to `image.Format.FMT_YVU420SP`, stop on the first encoder/format error, and avoid retry loops that flood the console.
 - `draw_tuning_view(img, targets, config, stats, ui_state)` showing editable thresholds, ROI, area filters, smoothing, lost timeout, and command rate.
 - `command_from_target(target, config)` that bounds robot commands and handles lost targets.
+- For the displayed `FPS`, combine `cam.fps()` with the measured loop FPS and show the smaller effective rate. Never present raw Python loop FPS as camera FPS.
 - Main loop that keeps the program in the foreground, reads camera/input every frame, draws the current view, sends rate-limited output, and exits gracefully.
 
 Use small probe scripts before full programs when hardware details are unknown:
@@ -126,6 +130,10 @@ save
 dump
 ```
 
+## Offline Threshold Tool
+
+When a user needs offline color threshold tuning, use `tools/color_threshold_tuner.html` before writing new custom tooling. It is a single-file browser tool that imports image folders or videos, steps or plays media, compares the original frame with a binary mask, supports LAB/HSV/RGB/YCrCb/GRAY thresholds, applies ROI and area filters, and exports `color_blob_config.json`. For the current MaixPy `find_blobs` pipeline, prefer LAB export unless the board code has explicitly been changed to another color space.
+
 ## Verification Expectations
 
 For every delivered solution, include:
@@ -148,6 +156,11 @@ For every delivered solution, include:
 | Measuring only "it detects once" | Measure FPS, false positives, lost frames, and command stability |
 | Sending raw pixel error directly to motors | Add deadband, smoothing, rate limits, and lost-target fallback |
 | Ignoring display cost | Allow overlay density to be reduced during speed tests |
+| Adding a one-off touch coordinate path or hit rule for a single button | All buttons must share one `map_touch` path, one `touch_hit` rule, and the same configurable touch slop; fix size/placement, not per-button logic |
+| Placing touch regions too close to a bottom parameter grid | Use shared layout constants and keep at least a `2 * touch_slop` vertical guard between unrelated touch regions |
 | Defaulting to serial-only tuning on MaixCAM | Prefer foreground run/tuning views with touchscreen and buttons, keep UART as fallback |
 | Hard-coding one lab scene | Keep config editable and document the tuning order |
-| Building vision apps without capture tools | Add photo and recording controls so real frames can be collected for offline debugging |
+| Mixing dataset capture into every vision app | Keep `capture_dataset.py` separate so the production run/tune UI stays compact and predictable |
+| Offline threshold sliders cannot drag or feel laggy | Do not rebuild slider DOM on `input`; sync existing controls, throttle rendering with `requestAnimationFrame`, and cache per-frame color-space conversion results |
+| On-screen FPS shows 300-400 on a 25/30 FPS camera | Raw loop timing is being shown | Use `cam.fps()` as the camera ceiling and display `min(camera_fps, loop_fps)` |
+| New task requires rewriting the tuning screen | Fields are hard-coded to LAB indexes | Keep one fixed UI and replace only `TUNABLE_PARAMS` paths plus task-specific normalization/detection |
