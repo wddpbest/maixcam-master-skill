@@ -53,6 +53,7 @@ Firmware compatibility notes from MaixCAM-Pro field logs:
 - For compact 320x240 tuning UIs, avoid `COLOR_WHITE`/`COLOR_BLACK` text on camera or binary previews when readability matters; prefer green/yellow/blue/red accents and keep labels short.
 - Keep touch button labels inside stable boxes. A 7-column bottom grid is too narrow for labels such as `L_MIN`; use shorter labels like `L-`, `L+`, `PIX`, `AREA`, `R-X`, or use fewer columns.
 - `maix.image.Image.save(path, quality=95)` can save JPG/PNG images. For offline debugging, create `/root/data/image/` and `/root/data/video/`. For H.264 recording, official docs require `image.Format.FMT_YVU420SP` camera frames and `video.Encoder(type=video.VideoType.VIDEO_H264_CBR)`; write `frame.to_bytes(False)` to a `.h264` file.
+- If logs show `Not support format:0` or `mmf_venc_push failed`, do not keep retrying `encoder.encode(rgb_img)`. Gate recording by camera format, stop on invalid frames, and show a clear UI message instead of flooding logs.
 
 Debug overlays should show:
 
