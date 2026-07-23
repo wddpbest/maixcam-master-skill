@@ -1,0 +1,19 @@
+name: maixcam-master-skill
+authors: [wddpbest]
+category: Tool
+tags: [MaixCAM, MaixPy, CV, 视觉识别, Codex Skill]
+status: done
+updated: 2026-07-24
+summary: 面向 MaixCAM 和 MaixPy 视觉识别任务的 Codex skill，提供分阶段验证、屏幕优先调参和机器人输出工作流。
+
+collection: AI Skills
+readme: README.md
+
+links:
+  github: https://github.com/wddpbest/maixcam-master-skill
+
+subskills:
+  - name: maixcam-master
+    status: stable
+    path: maixcam-master
+    summary: 指导 MaixCAM 视觉识别、MaixPy API 查证、触摸屏调参、动态验证和串口控制输出。
